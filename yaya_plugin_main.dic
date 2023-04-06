@@ -1,0 +1,182 @@
+// ****使い方****
+// 関数名はイベント名そのままです。SHIORI/3.0テンプレートのように、
+// 文字列取得時頭にOn_がつくようなことはありません。
+// 値を返すとその内容をSakuraScriptとして実行します
+// 以下の変数に代入すると、動作を制御できます。
+//   res_event , res_reference[0]...[n]
+//     指定したイベントをReferenceつきで発生します。referenceは省略可
+//   res_target
+//     スクリプトやイベントをどのゴーストに送るかを指定します。
+//     Sakura名を指定してください。また、__SYSTEM_ALL_GHOST__で全起動中ゴーストに通知します。
+//     省略すると「プラグインメニューを実行したゴースト」に送ります
+//   res_marker
+//     バルーンのマーカー(下に小さく出るステータス表示)に表示する文字を指定できます。
+//   res_event_option / res_script_option
+//     それぞれ、EventOption / ScriptOptionヘッダを設定します。
+// 詳しくはプラグイン仕様書を参照してください。
+// http://emily.shillest.net/specwiki/index.php?PLUGIN%2F2.0%2F%E4%BB%95%E6%A7%98%E6%9B%B8
+
+// 初期化処理
+OnSystemLoad
+{
+  name = 'GhostWardrobe'
+
+  var_prefix_bind_script = 'bind_script'
+  var_prefix_shell_path = 'shell_path'
+  var_prefix_bind_part = 'bind_part'
+}
+
+OnSystemUnload
+{
+  ERASEVAR('bind_save_dat_lastchanged')
+  ERASEVAR('bind_save_queue_ghost')
+  ERASEVAR('current_ghost')
+  ERASEVAR('current_shell')
+  ERASEVAR('is_limit_dressup_changed_dialog')
+}
+
+OnGhostBoot
+{
+  OnGhostInfoUpdate
+}
+
+OnGhostInfoUpdate : void
+{
+  LETTONAME("%(var_prefix_shell_path).%(reference[1]).%(reference[2])", reference[5])
+}
+
+OnMenuExec
+{
+  current_ghost = reference[1]
+  current_shell = reference[2]
+
+  "\_q%(version)\n\n/
+  \![*]\q[現在の着せ替え状態を保存,OnBindSave]\n/
+  \![*]\q[読み込み,OnBindRestoreMenu]\n\n/
+  \![*]\q[閉じる,]"
+}
+
+OnBindSave
+{
+  _shell_dat = EVAL("%(var_prefix_shell_path).%(current_ghost).%(current_shell)") + '\profile\shell.dat'
+  bind_save_dat_lastchanged = FATTRIB(_shell_dat)[10]
+  bind_save_queue_ghost = current_ghost
+  "保存のためシェルを再読み込みします。\![change,shell,%(current_shell)]"
+}
+
+OnOtherGhostTalk
+{
+  if reference[3] == 'OnDressupChanged' && is_limit_dressup_changed_dialog {
+    // OnDressupChangedのセリフでメニューが閉じられるのを抑制
+    is_limit_dressup_changed_dialog = 0
+    "\![raiseplugin,%(name),OnBindRestoreMenu]"
+  }
+}
+
+OnSecondChange
+{
+  // OnShellChangedにフックして保存処理を行う
+  if bind_save_queue_ghost != '' {
+    SaveBindInfo
+  }
+}
+
+SaveBindInfo
+{
+  _shell_dat = EVAL("%(var_prefix_shell_path).%(bind_save_queue_ghost).%(current_shell)") + '\profile\shell.dat'
+  if FATTRIB(_shell_dat)[10] != bind_save_dat_lastchanged {
+    "\![raiseplugin,%(name),OnReloadShell,%(bind_save_queue_ghost)]"
+  }
+}
+
+OnReloadShell
+{
+  _shell_path = EVAL("%(var_prefix_shell_path).%(current_ghost).%(current_shell)")
+  _shell_dat = _shell_path + '\profile\shell.dat'
+  _shell_descript = _shell_path + '\descript.txt'
+  _binds = IARRAY
+
+  // shell.datから各着せ替えパーツのオンオフ情報を取り出す
+  if FOPEN(_shell_dat, 'r') != 0 {
+    _line = ''
+    while 1 {
+      _line = FREAD(_shell_dat)
+      if RE_SEARCH(_line, 'char0\.bind\.savearray') {
+        break
+      }
+    }
+    _binds = SPLIT(SPLIT(_line, ',')[1], ' ')
+  }
+  else {
+    'error: ファイル読み取り(shell.dat)に失敗しました'
+  }
+  void FCLOSE(_shell_dat)
+
+  // descript.txtから各着せ替えパーツの番号とカテゴリ名&パーツ名の対応関係を取り出す
+  if FOPEN(_shell_descript, 'r') != 0 {
+    _line = ''
+    while 1 {
+      _line = FREAD(_shell_descript)
+      if RE_SEARCH(_line, '^sakura\.bindgroup') {
+        _bind_info = SPLIT(RE_REPLACEEX(_line, '^sakura\.bindgroup([0-9]+)\.name', '$1'), ',')
+        LETTONAME("%(var_prefix_bind_part).%(current_ghost).%(current_shell).%(_bind_info[0])", "%(_bind_info[1]),%(_bind_info[2])")
+      }
+    }
+  }
+  else {
+    'error: ファイル読み取り(descript.txt)に失敗しました'
+  }
+  void FCLOSE(_shell_descript)
+
+  // 着せ替え読み込み用のさくらスクリプトを作る
+  _bind_scripts = ''
+  foreach _binds; _bind {
+    _b = SPLIT(_bind, '=')
+    _bind_scripts += '\![bind,' + EVAL("%(var_prefix_bind_part).%(current_ghost).%(current_shell).%(_b[0])") + ",%(_b[1])]"
+  }
+
+  _key = STRDIGEST(_bind_scripts, 'CRC32')
+  LETTONAME("%(var_prefix_bind_script).%(current_ghost).%(current_shell).%(_key)", _bind_scripts)
+
+  bind_save_queue_ghost = ''
+  "\1\s[10]\0\s[0]\_q着せ替えを保存しました。\n保存名: %(_key)\x\![raiseplugin,%(name),OnMenuExec,dummy,%(current_ghost),%(current_shell)]"
+}
+
+OnBindRestoreMenu
+{
+  _vars = GETVARLIST("%(var_prefix_bind_script).%(current_ghost).%(current_shell)")
+  _script = "\_q保存した着せ替えの呼び出し\nGhost: %(current_ghost)\nShell: %(current_shell)\n\n"
+  foreach _vars; _var {
+    _sp = SPLIT(_var, '.')
+    _key = _sp[ARRAYSIZE(_sp) - 1]
+    _script += "\![*]\q[%(_key),OnBindRestoreSelected,%(_var)]  \q[delete,OnEraseDressupVar,%(_var)]\n"
+  }
+  _script + "\n\![*]\q[戻る,OnMenuExec,dummy,%(current_ghost),%(current_shell)]"
+}
+
+OnEraseDressupVar
+{
+  _sp = SPLIT(reference[0], '.')
+  _key = _sp[ARRAYSIZE(_sp) - 1]
+  "\0\_q「%(_key)」を削除しますか？\n/
+  \![*]\q[削除する,OnEraseDressupVarConfirmed,%(reference[0])]/
+  \![*]\q[削除しない,OnBindRestoreMenu]/
+  "
+}
+
+OnEraseDressupVarConfirmed
+{
+  ERASEVAR(reference[0])
+  "\_q削除しました。\x\![raiseplugin,%(name),OnBindRestoreMenu]"
+}
+
+OnBindRestoreSelected
+{
+  is_limit_dressup_changed_dialog = 1
+  EVAL(reference[0]) + "\![raiseplugin,%(name),OnBindRestoreMenu,%(current_ghost)]"
+}
+
+version
+{
+  "%(name)/0.5.0"
+}
