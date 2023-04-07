@@ -58,7 +58,7 @@ OnMenuExec
 
 OnBindSave
 {
-  _shell_dat = EVAL("%(var_prefix_shell_path).%(current_ghost).%(current_shell)") + '\profile\shell.dat'
+  _shell_dat = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(current_ghost).%(current_shell)")) + '\profile\shell.dat'
   shell_dat_lastchanged = FATTRIB(_shell_dat)[10]
   save_queued_ghost = current_ghost
   '\_q保存中...\![reload,shell]'
@@ -77,7 +77,7 @@ OnSecondChange
 {
   // OnShellChangedにフックして保存処理を行う
   if save_queued_ghost != '' {
-    _shell_dat = EVAL("%(var_prefix_shell_path).%(save_queued_ghost).%(current_shell)") + '\profile\shell.dat'
+    _shell_dat = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(save_queued_ghost).%(current_shell)")) + '\profile\shell.dat'
     if FATTRIB(_shell_dat)[10] != shell_dat_lastchanged {
       "\![raiseplugin,%(name),OnReloadShell,%(save_queued_ghost)]"
     }
@@ -86,7 +86,7 @@ OnSecondChange
 
 OnReloadShell
 {
-  _shell_path = EVAL("%(var_prefix_shell_path).%(current_ghost).%(current_shell)")
+  _shell_path = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(current_ghost).%(current_shell)"))
   _shell_dat = _shell_path + '\profile\shell.dat'
   _shell_descript = _shell_path + '\descript.txt'
   _binds = IARRAY
@@ -114,7 +114,7 @@ OnReloadShell
       _line = FREAD(_shell_descript)
       if RE_SEARCH(_line, '^sakura\.bindgroup') {
         _bind_info = SPLIT(RE_REPLACEEX(_line, '^sakura\.bindgroup([0-9]+)\.name', '$1'), ',')
-        LETTONAME("%(var_prefix_bind_part).%(current_ghost).%(current_shell).%(_bind_info[0])", "%(_bind_info[1]),%(_bind_info[2])")
+        LETTONAME(EscapeSpaces("%(var_prefix_bind_part).%(current_ghost).%(current_shell).%(_bind_info[0])"), "%(_bind_info[1]),%(_bind_info[2])")
       }
     }
   }
@@ -127,11 +127,11 @@ OnReloadShell
   _bind_scripts = ''
   foreach _binds; _bind {
     _b = SPLIT(_bind, '=')
-    _bind_scripts += '\![bind,' + EVAL("%(var_prefix_bind_part).%(current_ghost).%(current_shell).%(_b[0])") + ",%(_b[1])]"
+    _bind_scripts += '\![bind,' + EVAL(EscapeSpaces("%(var_prefix_bind_part).%(current_ghost).%(current_shell).%(_b[0])")) + ",%(_b[1])]"
   }
 
   _key = STRDIGEST(_bind_scripts, 'CRC32')
-  LETTONAME("%(var_prefix_bind_script).%(current_ghost).%(current_shell).%(_key)", _bind_scripts)
+  LETTONAME(EscapeSpaces("%(var_prefix_bind_script).%(current_ghost).%(current_shell).%(_key)"), _bind_scripts)
 
   save_queued_ghost = ''
   "\1\s[10]\0\s[0]\_q着せ替えを保存しました。\n保存名: %(_key)\x\![raiseplugin,%(name),OnMenuExec,dummy,%(current_ghost),%(current_shell)]"
@@ -168,7 +168,12 @@ OnEraseDressupVarConfirmed
 OnBindRestoreSelected
 {
   is_limit_dressup_changed_dialog = 1
-  EVAL(reference[0]) + "\![raiseplugin,%(name),OnBindRestoreMenu,%(current_ghost)]"
+  EVAL(EscapeSpaces(reference[0])) + "\![raiseplugin,%(name),OnBindRestoreMenu,%(current_ghost)]"
+}
+
+EscapeSpaces
+{
+  REPLACE(_argv[0], ' ', '_')
 }
 
 version
