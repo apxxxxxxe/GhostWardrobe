@@ -28,8 +28,8 @@ OnSystemLoad
 
 OnSystemUnload
 {
-  ERASEVAR('bind_save_dat_lastchanged')
-  ERASEVAR('bind_save_queue_ghost')
+  ERASEVAR('shell_dat_lastchanged')
+  ERASEVAR('save_queued_ghost')
   ERASEVAR('current_ghost')
   ERASEVAR('current_shell')
   ERASEVAR('is_limit_dressup_changed_dialog')
@@ -59,9 +59,9 @@ OnMenuExec
 OnBindSave
 {
   _shell_dat = EVAL("%(var_prefix_shell_path).%(current_ghost).%(current_shell)") + '\profile\shell.dat'
-  bind_save_dat_lastchanged = FATTRIB(_shell_dat)[10]
-  bind_save_queue_ghost = current_ghost
-  "保存のためシェルを再読み込みします。\![change,shell,%(current_shell)]"
+  shell_dat_lastchanged = FATTRIB(_shell_dat)[10]
+  save_queued_ghost = current_ghost
+  '\_q保存中...\![reload,shell]'
 }
 
 OnOtherGhostTalk
@@ -76,16 +76,11 @@ OnOtherGhostTalk
 OnSecondChange
 {
   // OnShellChangedにフックして保存処理を行う
-  if bind_save_queue_ghost != '' {
-    SaveBindInfo
-  }
-}
-
-SaveBindInfo
-{
-  _shell_dat = EVAL("%(var_prefix_shell_path).%(bind_save_queue_ghost).%(current_shell)") + '\profile\shell.dat'
-  if FATTRIB(_shell_dat)[10] != bind_save_dat_lastchanged {
-    "\![raiseplugin,%(name),OnReloadShell,%(bind_save_queue_ghost)]"
+  if save_queued_ghost != '' {
+    _shell_dat = EVAL("%(var_prefix_shell_path).%(save_queued_ghost).%(current_shell)") + '\profile\shell.dat'
+    if FATTRIB(_shell_dat)[10] != shell_dat_lastchanged {
+      "\![raiseplugin,%(name),OnReloadShell,%(save_queued_ghost)]"
+    }
   }
 }
 
@@ -138,7 +133,7 @@ OnReloadShell
   _key = STRDIGEST(_bind_scripts, 'CRC32')
   LETTONAME("%(var_prefix_bind_script).%(current_ghost).%(current_shell).%(_key)", _bind_scripts)
 
-  bind_save_queue_ghost = ''
+  save_queued_ghost = ''
   "\1\s[10]\0\s[0]\_q着せ替えを保存しました。\n保存名: %(_key)\x\![raiseplugin,%(name),OnMenuExec,dummy,%(current_ghost),%(current_shell)]"
 }
 
