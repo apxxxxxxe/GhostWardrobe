@@ -24,6 +24,8 @@ OnSystemLoad
   var_prefix_bind_script = 'bind_script'
   var_prefix_shell_path = 'shell_path'
   var_prefix_bind_part = 'bind_part'
+  var_prefix_scope_count = 'scope_count'
+  var_prefix_chara_names = 'chara_names'
 }
 
 OnSystemUnload
@@ -32,35 +34,133 @@ OnSystemUnload
   ERASEVAR('save_queued_ghost')
   ERASEVAR('current_ghost')
   ERASEVAR('current_shell')
+  ERASEVAR('current_scope')
   ERASEVAR('is_limit_dressup_changed_dialog')
 }
 
-OnGhostBoot
+OnGhostBoot : void
 {
   OnGhostInfoUpdate
 }
 
 OnGhostInfoUpdate : void
 {
-  LETTONAME("%(var_prefix_shell_path).%(reference[1]).%(reference[2])", reference[5])
+  LETTONAME(EscapeSpaces("%(var_prefix_shell_path).%(reference[1]).%(reference[2])"), reference[5])
+
+  // shell.datから着せ替えを持つキャラクター(\0,\1,...)の数を割り出す
+  _shell_dat = "%(reference[5])\profile\shell.dat"
+  _scope_count = 0
+  if FOPEN(_shell_dat, 'r') != 0 {
+    while 1 {
+      _line = FREAD(_shell_dat)
+      if _line == -1 {
+        break
+      }
+      elseif RE_SEARCH(_line, 'char[0-9]+\.bind\.savearray') {
+        _scope_count++
+      }
+    }
+    LETTONAME(EscapeSpaces("%(var_prefix_scope_count).%(reference[1]).%(reference[2])"), _scope_count)
+  }
+  else {
+    'error: ファイル読み取り(shell.dat)に失敗しました'
+    return
+  }
+  void FCLOSE(_shell_dat)
+
+  // ghost/descript.txtからキャラクター(\0,\1,...)の名前を変数に格納する
+  _ghost_descript = "%(reference[4])\ghost\master\descript.txt"
+  if FOPEN(_ghost_descript, 'r') != 0 {
+    _chara_names = IARRAY
+    for _i=0; _i<_scope_count; _i++ {
+      _chara_names ,= GetDescriptScope(_i)
+    }
+
+    while 1 {
+      _line = FREAD(_ghost_descript)
+      if _line == -1 {
+        break
+      }
+      elseif RE_SEARCH(_line, '(sakura|kero|char[0-9]+)\.name,(.+)') {
+        _scope = 0
+        case RE_GETSTR()[1] {
+          when 'sakura' {
+            _scope = 0
+          }
+          when 'kero' {
+            _scope = 1
+          }
+          others {
+            _scope = TOINT(SUBSTR(RE_GETSTR[1], 4, 5))
+          }
+        }
+        _chara_names[_scope] = RE_GETSTR()[2]
+      }
+    }
+    LETTONAME(EscapeSpaces("%(var_prefix_chara_names).%(reference[1])"), _chara_names)
+  }
+  else {
+    'error: ファイル読み取り(descript.txt)に失敗しました'
+    return
+  }
+  void FCLOSE(_ghost_descript)
+
 }
 
 OnMenuExec
 {
   current_ghost = reference[1]
   current_shell = reference[2]
+  current_scope = 0
 
-  "\_q%(version)\n\n/
-  \![*]\q[現在の着せ替え状態を保存,OnBindSave]\n/
-  \![*]\q[読み込み,OnBindRestoreMenu]\n\n/
-  \![*]\q[閉じる,]"
+  _choices = ''
+  if EVAL(EscapeSpaces("%(var_prefix_scope_count).%(current_ghost).%(current_shell)")) == 1 {
+    _choices = '/
+    \![*]\q[現在の着せ替え状態を保存,OnBindSave,0]\n/
+    \![*]\q[読み込み,OnBindRestoreMenu,0]\n\n/
+    '
+  }
+  else {
+    _choices = '/
+    \![*]\q[現在の着せ替え状態を保存,OnBindSavePre]\n/
+    \![*]\q[読み込み,OnBindRestoreMenuPre]\n\n/
+    '
+  }
+
+  "\_qプラグイン %(version)\n\n/
+  %(_choices)/
+  \![*]\q[閉じる,OnMenuClose]"
+}
+
+OnMenuClose
+{
+  ERASEVAR('current_ghost')
+  ERASEVAR('current_shell')
+  ERASEVAR('current_scope')
+}
+
+OnBindSavePre
+{
+  _msg = '\_qどのキャラクターの着せ替えを保存しますか？\n\n'
+  --
+  for _i=0; _i<EVAL(EscapeSpaces("%(var_prefix_scope_count).%(current_ghost).%(current_shell)")); _i++ {
+    _msg += "\![*]\q[%(GetCharacterName(_i)),OnBindSave,%(_i)]\n"
+  }
+  _msg += "\n\![*]\q[戻る,OnMenuExec,dummy,%(current_ghost),%(current_shell)]"
+
+  _msg
 }
 
 OnBindSave
 {
   _shell_dat = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(current_ghost).%(current_shell)")) + '\profile\shell.dat'
   shell_dat_lastchanged = FATTRIB(_shell_dat)[10]
+  if shell_dat_lastchanged == -1 {
+    'error: ファイル属性読み取り(shell.dat)に失敗しました'
+    return
+  }
   save_queued_ghost = current_ghost
+  current_scope = reference[0]
   '\_q保存中...\![reload,shell]'
 }
 
@@ -78,15 +178,20 @@ OnSecondChange
   // OnShellChangedにフックして保存処理を行う
   if save_queued_ghost != '' {
     _shell_dat = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(save_queued_ghost).%(current_shell)")) + '\profile\shell.dat'
-    if FATTRIB(_shell_dat)[10] != shell_dat_lastchanged {
-      "\![raiseplugin,%(name),OnReloadShell,%(save_queued_ghost)]"
+    _lastchanged = FATTRIB(_shell_dat)[10]
+    if _lastchanged == -1 {
+      'error: ファイル属性読み取り(shell.dat)に失敗しました'
+      return
+    }
+    if _lastchanged != shell_dat_lastchanged {
+      "\![raiseplugin,%(name),OnReloadShell]"
     }
   }
 }
 
 OnReloadShell
 {
-  _shell_path = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(current_ghost).%(current_shell)"))
+  _shell_path = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(save_queued_ghost).%(current_shell)"))
   _shell_dat = _shell_path + '\profile\shell.dat'
   _shell_descript = _shell_path + '\descript.txt'
   _binds = IARRAY
@@ -96,7 +201,7 @@ OnReloadShell
     _line = ''
     while 1 {
       _line = FREAD(_shell_dat)
-      if RE_SEARCH(_line, 'char0\.bind\.savearray') {
+      if RE_SEARCH(_line, "char%(current_scope)\.bind\.savearray") {
         break
       }
     }
@@ -104,6 +209,7 @@ OnReloadShell
   }
   else {
     'error: ファイル読み取り(shell.dat)に失敗しました'
+    return
   }
   void FCLOSE(_shell_dat)
 
@@ -112,35 +218,55 @@ OnReloadShell
     _line = ''
     while 1 {
       _line = FREAD(_shell_descript)
-      if RE_SEARCH(_line, '^sakura\.bindgroup[0-9+]\.name') {
-        _bind_info = SPLIT(RE_REPLACEEX(_line, '^sakura\.bindgroup([0-9]+)\.name', '$1'), ',')
-        LETTONAME(EscapeSpaces("%(var_prefix_bind_part).%(current_ghost).%(current_shell).%(_bind_info[0])"), "%(_bind_info[1]),%(_bind_info[2])")
+      _rep = "^%(GetDescriptScope(current_scope))\.bindgroup([0-9]+)\.name"
+      if RE_SEARCH(_line, _rep) {
+        _bind_info = SPLIT(RE_REPLACEEX(_line, _rep, '$1'), ',')
+        LETTONAME(EscapeSpaces("%(var_prefix_bind_part).%(save_queued_ghost).%(current_shell).%(current_scope).%(_bind_info[0])"), "%(_bind_info[1]),%(_bind_info[2])")
       }
     }
   }
   else {
     'error: ファイル読み取り(descript.txt)に失敗しました'
+    return
   }
   void FCLOSE(_shell_descript)
 
   // 着せ替え読み込み用のさくらスクリプトを作る
-  _bind_scripts = ''
+  _bind_scripts = "\p[%(current_scope)]"
   foreach _binds; _bind {
     _b = SPLIT(_bind, '=')
-    _bind_scripts += '\![bind,' + EVAL(EscapeSpaces("%(var_prefix_bind_part).%(current_ghost).%(current_shell).%(_b[0])")) + ",%(_b[1])]"
+    _bind_scripts += '\![bind,' + EVAL(EscapeSpaces("%(var_prefix_bind_part).%(save_queued_ghost).%(current_shell).%(current_scope).%(_b[0])")) + ",%(_b[1])]"
   }
 
   _key = STRDIGEST(_bind_scripts, 'CRC32')
-  LETTONAME(EscapeSpaces("%(var_prefix_bind_script).%(current_ghost).%(current_shell).%(_key)"), _bind_scripts)
+  LETTONAME(EscapeSpaces("%(var_prefix_bind_script).%(save_queued_ghost).%(current_shell).%(current_scope).%(_key)"), _bind_scripts)
 
   save_queued_ghost = ''
-  "\1\s[10]\0\s[0]\_q着せ替えを保存しました。\n保存名: %(_key)\x\![raiseplugin,%(name),OnMenuExec,dummy,%(current_ghost),%(current_shell)]"
+  "\1\s[10]\0\s[0]\_q着せ替えを保存しました。\n保存名: %(_key)\x\![raiseplugin,%(name),OnMenuExec,dummy,%(save_queued_ghost),%(current_shell)]"
+}
+
+OnBindRestoreMenuPre
+{
+  _msg = '\_qどのキャラクターの着せ替えを読み込みますか？\n\n'
+  --
+  for _i=0; _i<EVAL(EscapeSpaces("%(var_prefix_scope_count).%(current_ghost).%(current_shell)")); _i++ {
+    _msg += "\![*]\q[%(GetCharacterName(_i)),OnBindRestoreMenu,%(_i)]\n"
+  }
+  _msg += "\n\![*]\q[戻る,OnMenuExec,dummy,%(current_ghost),%(current_shell)]"
+
+  _msg
 }
 
 OnBindRestoreMenu
 {
-  _vars = GETVARLIST("%(var_prefix_bind_script).%(current_ghost).%(current_shell)")
-  _script = "\_q保存した着せ替えの呼び出し\nGhost: %(current_ghost)\nShell: %(current_shell)\n\n"
+  if ARRAYSIZE(reference) > 0 {
+    current_scope = reference[0]
+  }
+  _vars = GETVARLIST(EscapeSpaces("%(var_prefix_bind_script).%(current_ghost).%(current_shell).%(current_scope)"))
+  _script = "\_q保存した着せ替えの呼び出し\n/
+  Ghost: %(current_ghost)\n/
+  Shell: %(current_shell)\n/
+  ScopeCount: " + EVAL(EscapeSpaces("%(var_prefix_scope_count).%(current_ghost).%(current_shell)")) + '\n\n'
   foreach _vars; _var {
     _sp = SPLIT(_var, '.')
     _key = _sp[ARRAYSIZE(_sp) - 1]
@@ -168,12 +294,34 @@ OnEraseDressupVarConfirmed
 OnBindRestoreSelected
 {
   is_limit_dressup_changed_dialog = 1
-  EVAL(EscapeSpaces(reference[0])) + "\![raiseplugin,%(name),OnBindRestoreMenu,%(current_ghost)]"
+  EVAL(EscapeSpaces(reference[0])) + "\![raiseplugin,%(name),OnBindRestoreMenu]"
 }
 
 EscapeSpaces
 {
   REPLACE(_argv[0], ' ', '_')
+}
+
+GetDescriptScope
+{
+  case _argv[0] {
+    when 0 {
+      'sakura'
+    }
+    when 1 {
+      'kero'
+    }
+    others {
+      "char%(_argv[0])"
+    }
+  }
+}
+
+GetCharacterName
+{
+  _scope = _argv[0]
+  _chara_names = EVAL(EscapeSpaces("%(var_prefix_chara_names).%(current_ghost)"))
+  _chara_names[_scope]
 }
 
 version
