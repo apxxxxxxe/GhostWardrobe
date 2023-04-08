@@ -113,22 +113,17 @@ OnMenuExec
   current_shell = reference[2]
   current_scope = 0
 
-  _choices = ''
+  _save_choice = ''
   if EVAL(EscapeSpaces("%(var_prefix_scope_count).%(current_ghost).%(current_shell)")) == 1 {
-    _choices = '/
-    \![*]\q[現在の着せ替え状態を保存,OnBindSave,0]\n/
-    \![*]\q[読み込み,OnBindRestoreMenu,0]\n\n/
-    '
+    _save_choice = '\![*]\q[現在の着せ替え状態を保存,OnBindSave,0]\n'
   }
   else {
-    _choices = '/
-    \![*]\q[現在の着せ替え状態を保存,OnBindSavePre]\n/
-    \![*]\q[読み込み,OnBindRestoreMenuPre]\n\n/
-    '
+    _save_choice = '\![*]\q[現在の着せ替え状態を保存,OnBindSavePre]\n'
   }
 
   "\_qプラグイン %(version)\n\n/
-  %(_choices)/
+  %(_save_choice)/
+  \![*]\q[読み込み,OnBindRestoreMenu]\n\n/
   \![*]\q[閉じる,OnMenuClose]"
 }
 
@@ -245,32 +240,19 @@ OnReloadShell
   "\1\s[10]\0\s[0]\_q着せ替えを保存しました。\n保存名: %(_key)\x\![raiseplugin,%(name),OnMenuExec,dummy,%(save_queued_ghost),%(current_shell)]"
 }
 
-OnBindRestoreMenuPre
-{
-  _msg = '\_qどのキャラクターの着せ替えを読み込みますか？\n\n'
-  --
-  for _i=0; _i<EVAL(EscapeSpaces("%(var_prefix_scope_count).%(current_ghost).%(current_shell)")); _i++ {
-    _msg += "\![*]\q[%(GetCharacterName(_i)),OnBindRestoreMenu,%(_i)]\n"
-  }
-  _msg += "\n\![*]\q[戻る,OnMenuExec,dummy,%(current_ghost),%(current_shell)]"
-
-  _msg
-}
-
 OnBindRestoreMenu
 {
-  if ARRAYSIZE(reference) > 0 {
-    current_scope = reference[0]
-  }
-  _vars = GETVARLIST(EscapeSpaces("%(var_prefix_bind_script).%(current_ghost).%(current_shell).%(current_scope)"))
-  _script = "\_q保存した着せ替えの呼び出し\n/
-  Ghost: %(current_ghost)\n/
-  Shell: %(current_shell)\n/
-  ScopeCount: " + EVAL(EscapeSpaces("%(var_prefix_scope_count).%(current_ghost).%(current_shell)")) + '\n\n'
-  foreach _vars; _var {
-    _sp = SPLIT(_var, '.')
-    _key = _sp[ARRAYSIZE(_sp) - 1]
-    _script += "\![*]\q[%(_key),OnBindRestoreSelected,%(_var)]  \q[delete,OnEraseDressupVar,%(_var)]\n"
+  _script = "\_q\0\b[2]保存した着せ替えの呼び出し\n/
+  現在のシェル: %(current_shell)\n\n"
+  for _scope=0; _scope<EVAL(EscapeSpaces("%(var_prefix_scope_count).%(current_ghost).%(current_shell)")); _scope++ {
+    _script += "■%(GetCharacterName(_scope))\n"
+    _vars = GETVARLIST(EscapeSpaces("%(var_prefix_bind_script).%(current_ghost).%(current_shell).%(_scope)"))
+    foreach _vars; _var {
+      _sp = SPLIT(_var, '.')
+      _key = _sp[ARRAYSIZE(_sp) - 1]
+      _script += "\![*]\q[%(_key),OnBindRestoreSelected,%(_var)]  \q[delete,OnEraseDressupVar,%(_var)]\n"
+    }
+    _script += '\n'
   }
   _script + "\n\![*]\q[戻る,OnMenuExec,dummy,%(current_ghost),%(current_shell)]"
 }
