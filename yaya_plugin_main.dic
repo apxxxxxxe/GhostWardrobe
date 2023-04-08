@@ -112,7 +112,7 @@ OnReloadShell
     _line = ''
     while 1 {
       _line = FREAD(_shell_descript)
-      if RE_SEARCH(_line, '^sakura\.bindgroup') {
+      if RE_SEARCH(_line, '^sakura\.bindgroup[0-9+]\.name') {
         _bind_info = SPLIT(RE_REPLACEEX(_line, '^sakura\.bindgroup([0-9]+)\.name', '$1'), ',')
         LETTONAME(EscapeSpaces("%(var_prefix_bind_part).%(current_ghost).%(current_shell).%(_bind_info[0])"), "%(_bind_info[1]),%(_bind_info[2])")
       }
