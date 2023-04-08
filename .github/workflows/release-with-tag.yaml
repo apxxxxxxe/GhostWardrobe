@@ -16,7 +16,7 @@ jobs:
         submodules: false
     - name: Zip output
       run: |
-        zip -r release.zip *
+        zip -r release.zip * md5core/\*
     - name: Create release
       id: create_release
       uses: actions/create-release@v1.0.0

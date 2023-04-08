@@ -14,7 +14,7 @@ jobs:
         submodules: false
     - name: Zip output
       run: |
-        zip -r release.zip * -x core/\*
+        zip -r release.zip * md5core/\*
     - name: Set current datetime as env variable
       env:
         TZ: 'Asia/Tokyo' # タイムゾーン指定

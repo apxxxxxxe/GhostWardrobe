@@ -20,6 +20,7 @@
 OnSystemLoad
 {
   name = 'GhostWardrobe'
+  FUNCTIONEX('proxy_ex.dll', '/charset', 'UTF-8')
 
   var_prefix_bind_script = 'bind_script'
   var_prefix_shell_path = 'shell_path'
@@ -158,7 +159,6 @@ OnBindSave
   }
   save_queued_ghost = current_ghost
   current_scope = reference[0]
-  '\_q保存中...\![reload,shell]'
   "\_q保存中...\![timerraiseplugin,100,1,%(name),OnReloadShell]\![reload,shell]"
 }
 
@@ -229,7 +229,9 @@ OnReloadShell
     _bind_scripts += '\![bind,' + EVAL(EscapeSpaces("%(var_prefix_bind_part).%(save_queued_ghost).%(current_shell).%(current_scope).%(_b[0])")) + ",%(_b[1])]"
   }
 
-  _key = STRDIGEST(_bind_scripts, 'CRC32')
+  // STRDIGESTがうまくいかないのでmd5.exeを使う
+  _key = FUNCTIONEX('proxy_ex.dll', 'md5.exe', _bind_scripts)
+
   LETTONAME(EscapeSpaces("%(var_prefix_bind_script).%(save_queued_ghost).%(current_shell).%(current_scope).%(_key)"), _bind_scripts)
 
   save_queued_ghost = ''
