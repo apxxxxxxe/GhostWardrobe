@@ -159,6 +159,7 @@ OnBindSave
   save_queued_ghost = current_ghost
   current_scope = reference[0]
   '\_q保存中...\![reload,shell]'
+  "\_q保存中...\![timerraiseplugin,100,1,%(name),OnReloadShell]\![reload,shell]"
 }
 
 OnOtherGhostTalk
@@ -176,19 +177,6 @@ OnSecondChange
   if updateOnLoad == 0 {
     updateOnLoad = 1
     "\C\![updateother,--plugin=%(name)]"
-  }
-
-  // OnShellChangedにフックして保存処理を行う
-  if save_queued_ghost != '' {
-    _shell_dat = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(save_queued_ghost).%(current_shell)")) + '\profile\shell.dat'
-    _lastchanged = FATTRIB(_shell_dat)[10]
-    if _lastchanged == -1 {
-      'error: ファイル属性読み取り(shell.dat)に失敗しました'
-      return
-    }
-    if _lastchanged != shell_dat_lastchanged {
-      "\![raiseplugin,%(name),OnReloadShell]"
-    }
   }
 }
 
