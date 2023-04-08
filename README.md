@@ -27,5 +27,10 @@
   - 各キャラクター(\0,\1,...)に対応
   - 各シェルに対応
 
+## 着せ替え保存データの名前について
+各保存データの名前は英数字の組み合わせですが、これは保存データの実体である着せ替えスクリプト(\![bind,...)をCRC32でハッシュ化したものです。  
+同じ着せ替えの組み合わせをハッシュ化した場合、同じデータ名が得られます。  
+よって同じ内容のデータが複数保存されることはありません。
+
 ## ダウンロード
 [![GhostWardrobe.nar](https://img.shields.io/github/v/release/apxxxxxxe/GhostWardrobe?color=%2367ab7b&label=GhostWardrobe.nar&logo=github)](https://github.com/apxxxxxxe/GhostWardrobe/releases/latest/download/GhostWardrobe.nar) 
