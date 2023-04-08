@@ -26,6 +26,8 @@ OnSystemLoad
   var_prefix_bind_part = 'bind_part'
   var_prefix_scope_count = 'scope_count'
   var_prefix_chara_names = 'chara_names'
+
+  updateOnLoad = 0
 }
 
 OnSystemUnload
@@ -170,6 +172,12 @@ OnOtherGhostTalk
 
 OnSecondChange
 {
+  // 起動したら１回だけ更新をかける
+  if updateOnLoad == 0 {
+    updateOnLoad = 1
+    "\C\![updateother,--plugin=%(name)]"
+  }
+
   // OnShellChangedにフックして保存処理を行う
   if save_queued_ghost != '' {
     _shell_dat = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(save_queued_ghost).%(current_shell)")) + '\profile\shell.dat'
