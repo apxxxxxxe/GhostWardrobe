@@ -73,6 +73,8 @@ OnGhostInfoUpdate : void
 
   // ghost/descript.txtからキャラクター(\0,\1,...)の名前を変数に格納する
   _ghost_descript = "%(reference[4])\ghost\master\descript.txt"
+  _current_fcharset = 0
+  FCHARSET(0)
   if FOPEN(_ghost_descript, 'r') != 0 {
     _chara_names = IARRAY
     for _i=0; _i<_scope_count; _i++ {
@@ -83,6 +85,12 @@ OnGhostInfoUpdate : void
       _line = FREAD(_ghost_descript)
       if _line == -1 {
         break
+      }
+      elseif 'charset,UTF-8' _in_ _line && _current_fcharset != 1 {
+        void FCLOSE(_ghost_descript)
+        _current_fcharset = 1
+        FCHARSET(1)
+        void FOPEN(_ghost_descript, 'r')
       }
       elseif RE_SEARCH(_line, '(sakura|kero|char[0-9]+)\.name,(.+)') {
         _scope = 0
@@ -100,6 +108,8 @@ OnGhostInfoUpdate : void
         _chara_names[_scope] = RE_GETSTR()[2]
       }
     }
+    _current_fcharset = 0
+    FCHARSET(0)
     LETTONAME(EscapeSpaces("%(var_prefix_chara_names).%(reference[1])"), _chara_names)
   }
   else {
@@ -205,16 +215,29 @@ OnReloadShell
   void FCLOSE(_shell_dat)
 
   // descript.txtから各着せ替えパーツの番号とカテゴリ名&パーツ名の対応関係を取り出す
+  _current_fcharset = 0
+  FCHARSET(0)
   if FOPEN(_shell_descript, 'r') != 0 {
     _line = ''
     while 1 {
       _line = FREAD(_shell_descript)
       _rep = "^%(GetDescriptScope(current_scope))\.bindgroup([0-9]+)\.name"
+      if _line == -1 {
+        break
+      }
+      elseif 'charset,UTF-8' _in_ _line && _current_fcharset != 1 {
+        void FCLOSE(_shell_descript)
+        _current_fcharset = 1
+        FCHARSET(1)
+        void FOPEN(_shell_descript, 'r')
+      }
       if RE_SEARCH(_line, _rep) {
         _bind_info = SPLIT(RE_REPLACEEX(_line, _rep, '$1'), ',')
         LETTONAME(EscapeSpaces("%(var_prefix_bind_part).%(save_queued_ghost).%(current_shell).%(current_scope).%(_bind_info[0])"), "%(_bind_info[1]),%(_bind_info[2])")
       }
     }
+    _current_fcharset = 0
+    FCHARSET(0)
   }
   else {
     'error: ファイル読み取り(descript.txt)に失敗しました'
@@ -306,5 +329,5 @@ GetCharacterName
 
 version
 {
-  "%(name)/0.5.0"
+  "%(name)/0.5.1"
 }
