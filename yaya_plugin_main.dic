@@ -258,7 +258,7 @@ OnReloadShell
   LETTONAME(EscapeSpaces("%(var_prefix_bind_script).%(save_queued_ghost).%(current_shell).%(current_scope).%(_key)"), _bind_scripts)
 
   save_queued_ghost = ''
-  "\1\s[10]\0\s[0]\_q着せ替えを保存しました。\n保存名: %(_key)\x\![raiseplugin,%(name),OnMenuExec,dummy,%(save_queued_ghost),%(current_shell)]"
+  "\_q着せ替えを保存しました。\n保存名: %(_key)\x\![raiseplugin,%(name),OnMenuExec,dummy,%(save_queued_ghost),%(current_shell)]"
 }
 
 OnBindRestoreMenu
@@ -329,5 +329,5 @@ GetCharacterName
 
 version
 {
-  "%(name)/0.5.1"
+  "%(name)/0.5.2"
 }
