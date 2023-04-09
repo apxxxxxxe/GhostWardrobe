@@ -197,6 +197,19 @@ OnReloadShell
   _shell_descript = _shell_path + '\descript.txt'
   _binds = IARRAY
 
+  // shell.datの最終更新日時を取得
+  _lastchanged = FATTRIB(_shell_dat)[10]
+  if _lastchanged == -1 {
+    'error: ファイル属性読み取り(shell.dat)に失敗しました'
+    return
+  }
+
+  // 最終更新日時が変わっていなければ再度timerraiseplugin
+  if _lastchanged == shell_dat_lastchanged {
+    '\![timerraiseplugin,250,1,%(name),OnReloadShell]'
+    return
+  }
+
   // shell.datから各着せ替えパーツのオンオフ情報を取り出す
   if FOPEN(_shell_dat, 'r') != 0 {
     _line = ''
@@ -329,5 +342,5 @@ GetCharacterName
 
 version
 {
-  "%(name)/0.5.2"
+  "%(name)/0.5.3"
 }
