@@ -229,8 +229,8 @@ OnReloadShell
     _bind_scripts += '\![bind,' + EVAL(EscapeSpaces("%(var_prefix_bind_part).%(save_queued_ghost).%(current_shell).%(current_scope).%(_b[0])")) + ",%(_b[1])]"
   }
 
-  // STRDIGESTがうまくいかないのでmd5.exeを使う
-  _key = FUNCTIONEX('proxy_ex.dll', 'md5.exe', _bind_scripts)
+  // STRDIGESTがうまくいかないのでhashing.exeを使う
+  _key = FUNCTIONEX('proxy_ex.dll', 'hashing.exe', _bind_scripts)
 
   LETTONAME(EscapeSpaces("%(var_prefix_bind_script).%(save_queued_ghost).%(current_shell).%(current_scope).%(_key)"), _bind_scripts)
 
