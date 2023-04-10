@@ -33,12 +33,12 @@ OnSystemLoad
 
 OnSystemUnload
 {
-  ERASEVAR('shell_dat_lastchanged')
-  ERASEVAR('save_queued_ghost')
   ERASEVAR('current_ghost')
   ERASEVAR('current_shell')
   ERASEVAR('current_scope')
   ERASEVAR('is_limit_dressup_changed_dialog')
+  ERASEVAR('is_reload_queued')
+  ERASEVAR('is_reload_completed')
 }
 
 OnGhostBoot : void
@@ -118,6 +118,10 @@ OnGhostInfoUpdate : void
   }
   void FCLOSE(_ghost_descript)
 
+  if is_reload_queued {
+    is_reload_queued = 0
+    is_reload_completed = 1
+  }
 }
 
 OnMenuExec
@@ -161,15 +165,9 @@ OnBindSavePre
 
 OnBindSave
 {
-  _shell_dat = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(current_ghost).%(current_shell)")) + '\profile\shell.dat'
-  shell_dat_lastchanged = FATTRIB(_shell_dat)[10]
-  if shell_dat_lastchanged == -1 {
-    'error: ファイル属性読み取り(shell.dat)に失敗しました'
-    return
-  }
-  save_queued_ghost = current_ghost
+  is_reload_queued = 1
   current_scope = reference[0]
-  "\_q保存中...\![timerraiseplugin,100,1,%(name),OnReloadShell]\![reload,shell]"
+  '\_q保存中...\![reload,shell]'
 }
 
 OnOtherGhostTalk
@@ -188,27 +186,18 @@ OnSecondChange
     updateOnLoad = 1
     "\C\![updateother,--plugin=%(name)]"
   }
+  elseif is_reload_completed {
+    is_reload_completed = 0
+    "\![raiseplugin,%(name),OnReloadShell]"
+  }
 }
 
 OnReloadShell
 {
-  _shell_path = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(save_queued_ghost).%(current_shell)"))
+  _shell_path = EVAL(EscapeSpaces("%(var_prefix_shell_path).%(current_ghost).%(current_shell)"))
   _shell_dat = _shell_path + '\profile\shell.dat'
   _shell_descript = _shell_path + '\descript.txt'
   _binds = IARRAY
-
-  // shell.datの最終更新日時を取得
-  _lastchanged = FATTRIB(_shell_dat)[10]
-  if _lastchanged == -1 {
-    'error: ファイル属性読み取り(shell.dat)に失敗しました'
-    return
-  }
-
-  // 最終更新日時が変わっていなければ再度timerraiseplugin
-  if _lastchanged == shell_dat_lastchanged {
-    '\![timerraiseplugin,250,1,%(name),OnReloadShell]'
-    return
-  }
 
   // shell.datから各着せ替えパーツのオンオフ情報を取り出す
   if FOPEN(_shell_dat, 'r') != 0 {
@@ -246,7 +235,7 @@ OnReloadShell
       }
       if RE_SEARCH(_line, _rep) {
         _bind_info = SPLIT(RE_REPLACEEX(_line, _rep, '$1'), ',')
-        LETTONAME(EscapeSpaces("%(var_prefix_bind_part).%(save_queued_ghost).%(current_shell).%(current_scope).%(_bind_info[0])"), "%(_bind_info[1]),%(_bind_info[2])")
+        LETTONAME(EscapeSpaces("%(var_prefix_bind_part).%(current_ghost).%(current_shell).%(current_scope).%(_bind_info[0])"), "%(_bind_info[1]),%(_bind_info[2])")
       }
     }
     _current_fcharset = 0
@@ -262,16 +251,15 @@ OnReloadShell
   _bind_scripts = "\p[%(current_scope)]"
   foreach _binds; _bind {
     _b = SPLIT(_bind, '=')
-    _bind_scripts += '\![bind,' + EVAL(EscapeSpaces("%(var_prefix_bind_part).%(save_queued_ghost).%(current_shell).%(current_scope).%(_b[0])")) + ",%(_b[1])]"
+    _bind_scripts += '\![bind,' + EVAL(EscapeSpaces("%(var_prefix_bind_part).%(current_ghost).%(current_shell).%(current_scope).%(_b[0])")) + ",%(_b[1])]"
   }
 
   // STRDIGESTがうまくいかないのでhashing.exeを使う
   _key = FUNCTIONEX('proxy_ex.dll', 'hashing.exe', _bind_scripts)
 
-  LETTONAME(EscapeSpaces("%(var_prefix_bind_script).%(save_queued_ghost).%(current_shell).%(current_scope).%(_key)"), _bind_scripts)
+  LETTONAME(EscapeSpaces("%(var_prefix_bind_script).%(current_ghost).%(current_shell).%(current_scope).%(_key)"), _bind_scripts)
 
-  save_queued_ghost = ''
-  "\_q着せ替えを保存しました。\n保存名: %(_key)\x\![raiseplugin,%(name),OnMenuExec,dummy,%(save_queued_ghost),%(current_shell)]"
+  "\_q着せ替えを保存しました。\n保存名: %(_key)\x\![raiseplugin,%(name),OnMenuExec,dummy,%(current_ghost),%(current_shell)]"
 }
 
 OnBindRestoreMenu
@@ -342,5 +330,5 @@ GetCharacterName
 
 version
 {
-  "%(name)/0.5.3"
+  "%(name)/0.5.4"
 }
