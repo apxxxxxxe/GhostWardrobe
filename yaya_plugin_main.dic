@@ -37,8 +37,6 @@ OnSystemUnload
   ERASEVAR('current_shell')
   ERASEVAR('current_scope')
   ERASEVAR('is_limit_dressup_changed_dialog')
-  ERASEVAR('is_reload_queued')
-  ERASEVAR('is_reload_completed')
 }
 
 OnGhostBoot : void
@@ -117,11 +115,6 @@ OnGhostInfoUpdate : void
     return
   }
   void FCLOSE(_ghost_descript)
-
-  if is_reload_queued {
-    is_reload_queued = 0
-    is_reload_completed = 1
-  }
 }
 
 OnMenuExec
@@ -165,9 +158,8 @@ OnBindSavePre
 
 OnBindSave
 {
-  is_reload_queued = 1
   current_scope = reference[0]
-  '\_q保存中...\![reload,shell]'
+  "\_q保存中...\![reload,shell]\![raiseplugin,%(name),OnReloadShell]"
 }
 
 OnOtherGhostTalk
@@ -185,10 +177,6 @@ OnSecondChange
   if updateOnLoad == 0 {
     updateOnLoad = 1
     "\C\![updateother,--plugin=%(name)]"
-  }
-  elseif is_reload_completed {
-    is_reload_completed = 0
-    "\![raiseplugin,%(name),OnReloadShell]"
   }
 }
 
